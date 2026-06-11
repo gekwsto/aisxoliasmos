@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  EDITOR
+}
+
+enum ArticleStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  PUBLISHED
+  REJECTED
+}
+
+enum SourceType {
+  MANUAL
+  AI_GENERATED
+  AI_ASSISTED
+  RSS_SUMMARY
+}
+
+enum SocialPlatform {
+  FACEBOOK
+  INSTAGRAM
+  TWITTER
+}
+
+enum SocialPostStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  REJECTED
+  FAILED
+}
+
+enum ApprovalAction {
+  APPROVED
+  REJECTED
+}
+
+enum DiscoveredStatus {
+  NEW
+  DRAFT_CREATED
+  IGNORED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         Role       @default(EDITOR)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  articles     Article[]
+  approvals    Approval[]
+
+  @@map("users")
+}
+
+model Category {
+  id                 String              @id @default(cuid())
+  name               String
+  slug               String              @unique
+  color              String              @default("#6366f1")
+  articles           Article[]
+  rssSources         RssSource[]
+  discoveredArticles DiscoveredArticle[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  articles ArticleTag[]
+
+  @@map("tags")
+}
+
+model Article {
+  id             String        @id @default(cuid())
+  title          String
+  slug           String        @unique
+  excerpt        String
+  content        String        @db.Text
+  coverImage     String?
+  status         ArticleStatus @default(DRAFT)
+  sourceType     SourceType    @default(MANUAL)
+  aiCommentary   String?       @db.Text
+  seoTitle       String?
+  seoDescription String?
+  views          Int           @default(0)
+  readTime       Int           @default(3)
+  publishedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  authorId String
+  author   User    @relation(fields: [authorId], references: [id])
+
+  tags        ArticleTag[]
+  aiDraft     AiDraft?
+  socialPosts SocialPost[]
+  approvals   Approval[]
+
+  @@map("articles")
+}
+
+model ArticleTag {
+  articleId String
+  tagId     String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+  @@map("article_tags")
+}
+
+model AiDraft {
+  id        String   @id @default(cuid())
+  articleId String   @unique
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  prompt    String   @db.Text
+  rawOutput String   @db.Text
+  model       String   @default("gpt-4o")
+  imagePrompt String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  @@map("ai_drafts")
+}
+
+model SocialPost {
+  id          String           @id @default(cuid())
+  articleId   String
+  article     Article          @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  platform    SocialPlatform
+  content     String           @db.Text
+  status      SocialPostStatus @default(DRAFT)
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@map("social_posts")
+}
+
+model Approval {
+  id         String         @id @default(cuid())
+  articleId  String
+  article    Article        @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  reviewerId String
+  reviewer   User           @relation(fields: [reviewerId], references: [id])
+  action     ApprovalAction
+  note       String?
+  createdAt  DateTime       @default(now())
+
+  @@map("approvals")
+}
+
+model RssSource {
+  id            String              @id @default(cuid())
+  name          String
+  url           String              @unique
+  categoryId    String
+  category      Category            @relation(fields: [categoryId], references: [id])
+  enabled       Boolean             @default(true)
+  lastFetchedAt DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  articles      DiscoveredArticle[]
+
+  @@map("rss_sources")
+}
+
+model DiscoveredArticle {
+  id          String           @id @default(cuid())
+  sourceId    String
+  source      RssSource        @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  title       String
+  url         String           @unique
+  excerpt     String?          @db.Text
+  publishedAt DateTime?
+  categoryId  String
+  category    Category         @relation(fields: [categoryId], references: [id])
+  status      DiscoveredStatus @default(NEW)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("discovered_articles")
+}

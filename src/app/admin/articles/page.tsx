@@ -1,0 +1,121 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { FileText, Edit, Eye } from 'lucide-react';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { formatRelativeDate } from '@/lib/utils';
+import { ArticleStatus } from '@/generated/prisma/enums';
+import AdminShell from '@/components/admin/AdminShell';
+import ApprovalActions from '../approvals/ApprovalActions';
+
+export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Άρθρα | Admin ΑΙΣΧΟΛΙΑΣΜΟΣ',
+};
+
+const statusBadge: Record<ArticleStatus, { label: string; classes: string }> = {
+  DRAFT: { label: 'Πρόχειρο', classes: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' },
+  PENDING_APPROVAL: { label: 'Προς Έγκριση', classes: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' },
+  APPROVED: { label: 'Εγκεκριμένο', classes: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
+  PUBLISHED: { label: 'Δημοσιευμένο', classes: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
+  REJECTED: { label: 'Απορριφθέν', classes: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' },
+};
+
+export default async function ArticlesPage() {
+  const session = await auth();
+  if (!session?.user) redirect('/admin/login');
+
+  const articles = await prisma.article.findMany({
+    include: { category: true, author: { select: { name: true } } },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  return (
+    <AdminShell user={{ name: session.user.name, email: session.user.email, role: session.user.role }}>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <FileText size={22} className="text-slate-400" />
+              Όλα τα Άρθρα
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">{articles.length} άρθρα συνολικά</p>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+          {articles.length === 0 ? (
+            <div className="p-12 text-center text-slate-400 text-sm">
+              Δεν υπάρχουν άρθρα ακόμα.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700">
+                  <tr>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Τίτλος</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">Κατηγορία</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden md:table-cell">Κατάσταση</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden lg:table-cell">Τελ. Αλλαγή</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                  {articles.map((article) => {
+                    const badge = statusBadge[article.status];
+                    return (
+                      <tr key={article.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-slate-900 dark:text-slate-100 line-clamp-1 max-w-xs">
+                            {article.title}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">{article.author.name}</p>
+                        </td>
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">{article.category.name}</span>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.classes}`}>
+                            {badge.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 hidden lg:table-cell">
+                          <span className="text-xs text-slate-400">
+                            {formatRelativeDate(article.updatedAt.toISOString())}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2 justify-end">
+                            <Link
+                              href={`/admin/articles/${article.id}/preview`}
+                              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                              title="Preview"
+                            >
+                              <Eye size={14} />
+                            </Link>
+                            <Link
+                              href={`/admin/articles/${article.id}/edit`}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                              title="Επεξεργασία"
+                            >
+                              <Edit size={14} />
+                            </Link>
+                            {article.status === ArticleStatus.APPROVED && (
+                              <ApprovalActions articleId={article.id} showPublish />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </AdminShell>
+  );
+}
