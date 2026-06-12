@@ -6,6 +6,7 @@ import { Clock } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { mapPrismaArticle, ARTICLE_PUBLIC_SELECT } from '@/lib/article-mapper';
 import { addHeadingIds, extractHeadings } from '@/lib/toc';
+import { SITE_URL, articleCanonical, newsArticleJsonLd, breadcrumbJsonLd, organizationJsonLd, faqPageJsonLd } from '@/lib/seo';
 import CategoryBadge from '@/components/ui/CategoryBadge';
 import ShareButtons from '@/components/ui/ShareButtons';
 import Breadcrumbs from '@/components/ui/Breadcrumbs';
@@ -38,8 +39,11 @@ export async function generateMetadata({
       seoTitle: true,
       seoDescription: true,
       generatedImageUrl: true,
-      createdAt: true,
+      publishedAt: true,
+      updatedAt: true,
       status: true,
+      articleType: true,
+      tags: { include: { tag: { select: { name: true } } } },
       category: { select: { name: true } },
       author: { select: { name: true } },
     },
@@ -48,28 +52,46 @@ export async function generateMetadata({
 
   const title = raw.seoTitle || `${raw.title} | ΑΙΣΧΟΛΙΑΣΜΟΣ`;
   const description = raw.seoDescription || raw.excerpt || '';
-  const canonicalUrl = `https://aisxoliasmos.com/article/${slug}`;
+  const canonical = articleCanonical(slug);
+  const tags = raw.tags.map((t) => t.tag.name);
+  const publishedTime = (raw.publishedAt ?? raw.updatedAt).toISOString();
 
   return {
     title,
     description,
-    alternates: { canonical: canonicalUrl },
+    keywords: tags.join(', '),
+    alternates: { canonical },
+    authors: [{ name: raw.author.name }],
+    category: raw.category.name,
     openGraph: {
       title: raw.title,
       description,
-      url: canonicalUrl,
+      url: canonical,
       type: 'article',
-      publishedTime: raw.createdAt.toISOString(),
+      siteName: 'ΑΙΣΧΟΛΙΑΣΜΟΣ',
+      locale: 'el_GR',
+      publishedTime,
+      modifiedTime: raw.updatedAt.toISOString(),
       authors: [raw.author.name],
+      section: raw.category.name,
+      tags,
       ...(raw.generatedImageUrl
         ? { images: [{ url: raw.generatedImageUrl, width: 1200, height: 630, alt: raw.title }] }
         : {}),
     },
     twitter: {
       card: 'summary_large_image',
+      site: '@aisxoliasmos',
+      creator: '@aisxoliasmos',
       title: raw.title,
       description,
       ...(raw.generatedImageUrl ? { images: [raw.generatedImageUrl] } : {}),
+    },
+    other: {
+      'article:published_time': publishedTime,
+      'article:modified_time': raw.updatedAt.toISOString(),
+      'article:section': raw.category.name,
+      'article:tag': tags.join(','),
     },
   };
 }
@@ -83,7 +105,7 @@ export default async function ArticlePage({
 
   const raw = await prisma.article.findUnique({
     where: { slug },
-    select: { ...ARTICLE_PUBLIC_SELECT, status: true },
+    select: { ...ARTICLE_PUBLIC_SELECT, status: true, updatedAt: true, articleType: true, faqJson: true },
   });
 
   if (!raw || raw.status !== 'PUBLISHED') notFound();
@@ -92,34 +114,58 @@ export default async function ArticlePage({
   const contentWithIds = addHeadingIds(article.content);
   const headings = extractHeadings(contentWithIds);
 
-  // Related: same category, published, excluding self
-  const relatedRaw = await prisma.article.findMany({
-    where: { status: 'PUBLISHED', category: { slug: article.category.slug }, slug: { not: slug } },
-    orderBy: { createdAt: 'desc' },
-    take: 3,
-    select: ARTICLE_PUBLIC_SELECT,
-  });
+  const [relatedRaw, trendingRaw] = await Promise.all([
+    prisma.article.findMany({
+      where: { status: 'PUBLISHED', category: { slug: article.category.slug }, slug: { not: slug } },
+      orderBy: { publishedAt: 'desc' },
+      take: 3,
+      select: ARTICLE_PUBLIC_SELECT,
+    }),
+    prisma.article.findMany({
+      where: { status: 'PUBLISHED', slug: { not: slug }, NOT: { category: { slug: article.category.slug } } },
+      orderBy: { views: 'desc' },
+      take: 3,
+      select: ARTICLE_PUBLIC_SELECT,
+    }),
+  ]);
   const related = relatedRaw.map(mapPrismaArticle);
+  const trending = trendingRaw.map(mapPrismaArticle);
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Article',
-    headline: article.title,
-    description: article.excerpt,
-    datePublished: article.publishedAt,
-    author: { '@type': 'Person', name: article.author.name },
-    publisher: { '@type': 'Organization', name: 'ΑΙΣΧΟΛΙΑΣΜΟΣ', url: 'https://aisxoliasmos.com' },
-    mainEntityOfPage: { '@type': 'WebPage', '@id': `https://aisxoliasmos.com/article/${slug}` },
-    keywords: article.tags.join(', '),
-    ...(article.imageUrl ? { image: article.imageUrl } : {}),
-  };
+  const articleJsonLd = newsArticleJsonLd({
+    title: article.title,
+    excerpt: article.excerpt,
+    slug: article.slug,
+    publishedAt: article.publishedAt,
+    updatedAt: raw.updatedAt.toISOString(),
+    author: article.author.name,
+    category: article.category.name,
+    tags: article.tags,
+    imageUrl: article.imageUrl,
+    articleType: raw.articleType ?? 'NEWS',
+  });
+
+  const breadcrumbLd = breadcrumbJsonLd([
+    { name: 'Αρχική', url: SITE_URL },
+    { name: article.category.name, url: `${SITE_URL}/category/${article.category.slug}` },
+    { name: article.title, url: articleCanonical(slug) },
+  ]);
+
+  const orgLd = organizationJsonLd();
+
+  const faqItems =
+    Array.isArray(raw.faqJson)
+      ? (raw.faqJson as { question: string; answer: string }[]).filter(
+          (f) => f && typeof f.question === 'string' && typeof f.answer === 'string',
+        )
+      : [];
+  const faqLd = faqItems.length ? faqPageJsonLd(faqItems) : null;
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgLd) }} />
+      {faqLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
@@ -218,6 +264,20 @@ export default async function ArticlePage({
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {related.map((rel) => (
                     <ArticleCard key={rel.id} article={rel} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {trending.length > 0 && (
+              <div className="mt-10">
+                <h2 className="text-xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-5">
+                  <span className="w-1 h-5 bg-amber-500 rounded-full inline-block" />
+                  Δημοφιλή από άλλες κατηγορίες
+                </h2>
+                <div className="space-y-3">
+                  {trending.map((t) => (
+                    <ArticleCard key={t.id} article={t} variant="horizontal" />
                   ))}
                 </div>
               </div>

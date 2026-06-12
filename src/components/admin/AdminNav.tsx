@@ -17,6 +17,9 @@ import {
   BarChart2,
   AlertTriangle,
   ShieldCheck,
+  SearchCheck,
+  TreePine,
+  Brain,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +39,9 @@ const navItems = [
   { href: '/admin/operations', label: 'Operations', icon: Activity, exact: false },
   { href: '/admin/errors', label: 'Errors', icon: AlertTriangle, exact: false },
   { href: '/admin/readiness', label: 'Readiness', icon: ShieldCheck, exact: false },
+  { href: '/admin/seo', label: 'SEO', icon: SearchCheck, exact: false },
+  { href: '/admin/evergreen', label: 'Evergreen', icon: TreePine, exact: false },
+  { href: '/admin/evergreen-opportunities', label: 'AI Learning', icon: Brain, exact: false },
 ];
 
 export default function AdminNav({ user }: AdminNavProps) {

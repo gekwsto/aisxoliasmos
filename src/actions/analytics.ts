@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import { FacebookClient } from '@/lib/social/facebook';
 import { logEvent, SERVICE } from '@/lib/monitoring/events';
 import { SocialPlatform } from '@/generated/prisma/enums';
+import { computeTopicPerformanceFromDB, updatePredictionAccuracies } from '@/lib/ai/learning-engine';
 
 async function requireAuth() {
   const session = await auth();
@@ -59,6 +60,52 @@ export async function syncFacebookAnalytics(): Promise<SyncResult> {
       });
       synced++;
     }
+
+    // Background: refresh topic performance learning after FB sync
+    void (async () => {
+      try {
+        const [topics, accuracies] = await Promise.all([
+          computeTopicPerformanceFromDB(),
+          updatePredictionAccuracies(),
+        ]);
+        for (const tp of topics) {
+          await prisma.topicPerformance.upsert({
+            where: { topic: tp.topic },
+            update: {
+              category: tp.category,
+              avgReach: tp.avgReach,
+              avgComments: tp.avgComments,
+              avgShares: tp.avgShares,
+              avgReactions: tp.avgReactions,
+              avgDiscussionScore: tp.avgDiscussionScore,
+              avgFacebookScore: tp.avgFacebookScore,
+              articleCount: tp.articleCount,
+              performanceScore: tp.performanceScore,
+            },
+            create: {
+              topic: tp.topic,
+              category: tp.category,
+              avgReach: tp.avgReach,
+              avgComments: tp.avgComments,
+              avgShares: tp.avgShares,
+              avgReactions: tp.avgReactions,
+              avgDiscussionScore: tp.avgDiscussionScore,
+              avgFacebookScore: tp.avgFacebookScore,
+              articleCount: tp.articleCount,
+              performanceScore: tp.performanceScore,
+            },
+          });
+        }
+        void logEvent({
+          service: SERVICE.ANALYTICS,
+          type: 'learning_sync',
+          status: 'OK',
+          message: `Learning auto-sync: ${topics.length} topics, ${accuracies} accuracies`,
+        });
+      } catch {
+        // silent — learning is non-critical
+      }
+    })();
 
     void logEvent({
       service: SERVICE.ANALYTICS,

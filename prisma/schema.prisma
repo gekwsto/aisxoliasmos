@@ -9,6 +9,13 @@ datasource db {
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
+enum ArticleType {
+  NEWS
+  EVERGREEN
+  OPINION
+  GUIDE
+}
+
 enum Role {
   ADMIN
   EDITOR
@@ -124,11 +131,18 @@ model Article {
   generatedImageUrl String?
   imageStatus       ImageStatus   @default(NONE)
   status            ArticleStatus @default(DRAFT)
+  articleType       ArticleType   @default(NEWS)
   sourceType        SourceType    @default(MANUAL)
   aiCommentary      String?       @db.Text
   seoTitle          String?
   seoDescription    String?
-  views             Int           @default(0)
+  seoScore            Int?
+  evergreenKeyword    String?
+  secondaryKeywords   String[]      @default([])
+  faqJson             Json?
+  searchIntent        String?
+  estimatedDifficulty Int?
+  views               Int           @default(0)
   readTime          Int           @default(3)
   publishedAt       DateTime?
   createdAt         DateTime      @default(now())
@@ -286,10 +300,49 @@ model PostPerformance {
   actualShares       Int        @default(0)
   actualReactions    Int        @default(0)
   predictionAccuracy Int?
+  learningWeight     Float      @default(1.0)
   lastSyncedAt       DateTime?
   createdAt          DateTime   @default(now())
 
   @@map("post_performances")
+}
+
+model TopicPerformance {
+  id               String   @id @default(cuid())
+  topic            String   @unique
+  category         String   @default("")
+  avgReach         Float    @default(0)
+  avgComments      Float    @default(0)
+  avgShares        Float    @default(0)
+  avgReactions     Float    @default(0)
+  avgDiscussionScore Float  @default(0)
+  avgFacebookScore Float    @default(0)
+  articleCount     Int      @default(0)
+  performanceScore Float    @default(0)
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
+
+  @@map("topic_performances")
+}
+
+model EvergreenOpportunity {
+  id             String   @id @default(cuid())
+  topic          String
+  primaryKeyword String
+  articleType    String   @default("guide")
+  category       String   @default("")
+  seoScore       Int      @default(0)
+  businessValue  Int      @default(0)
+  difficulty     Int      @default(50)
+  evergreenValue Int      @default(0)
+  fbReusability  Int      @default(0)
+  overallScore   Int      @default(0)
+  clusterTopics  String[] @default([])
+  status         String   @default("new")
+  reasoning      String?  @db.Text
+  generatedAt    DateTime @default(now())
+
+  @@map("evergreen_opportunities")
 }
 
 model ScheduledPost {

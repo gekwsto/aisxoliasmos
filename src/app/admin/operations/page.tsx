@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import AdminShell from '@/components/admin/AdminShell';
@@ -75,6 +76,18 @@ async function fetchData() {
     fetchAllHealthChecks(),
   ]);
 
+  // SEO Health stats
+  const [seoTotal, seoMissingImage, seoMissingTitle, seoMissingDescription, seoMissingTags] = await Promise.all([
+    prisma.article.count({ where: { status: 'PUBLISHED' } }),
+    prisma.article.count({ where: { status: 'PUBLISHED', generatedImageUrl: null } }),
+    prisma.article.count({ where: { status: 'PUBLISHED', seoTitle: null } }),
+    prisma.article.count({ where: { status: 'PUBLISHED', seoDescription: null } }),
+    prisma.article.count({ where: { status: 'PUBLISHED', tags: { none: {} } } }),
+  ]);
+  const seoHealthScore = seoTotal === 0 ? 100 : Math.round(
+    (1 - Math.min(1, (seoMissingImage + seoMissingTitle + seoMissingDescription + seoMissingTags) / (seoTotal * 4))) * 100
+  );
+
   // Pre-filter stats today
   const preFilteredToday = await prisma.discoveredArticle.count({
     where: { filteredReason: { not: null }, createdAt: { gte: todayStart } },
@@ -149,6 +162,7 @@ async function fetchData() {
       trendingActive,
       viralActive,
     },
+    seoHealth: { seoHealthScore, seoMissingImage, seoMissingTitle, seoMissingDescription, seoMissingTags, seoTotal },
     costSavings: {
       preFilteredToday,
       tokensSavedToday,
@@ -235,7 +249,7 @@ export default async function OperationsPage() {
   if (!session?.user?.id) redirect('/admin/login');
 
   const data = await fetchData();
-  const { stats, costSavings, health, recentEvents, rssSources, openaiStats, topCluster, topArticle, overdueScheduled } = data;
+  const { stats, costSavings, health, recentEvents, rssSources, openaiStats, topCluster, topArticle, overdueScheduled, seoHealth } = data;
 
   const healthValues = Object.values(health);
   const hasAlert = healthValues.some((h) => h.status === 'error');
@@ -386,6 +400,42 @@ export default async function OperationsPage() {
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs text-muted-foreground">AI Generation Calls</p>
               <p className="mt-1 text-2xl font-bold">{costSavings.aiGenerationCallsToday}</p>
+            </div>
+          </div>
+        </section>
+
+        {/* SEO Health */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">SEO Health</h2>
+            <Link href="/admin/seo" className="text-xs text-red-600 hover:text-red-700 font-semibold">Λεπτομέρειες →</Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+            <div className={`rounded-lg border-2 bg-card p-4 ${seoHealth.seoHealthScore >= 80 ? 'border-green-400' : seoHealth.seoHealthScore >= 60 ? 'border-yellow-400' : 'border-red-400'}`}>
+              <p className="text-xs text-muted-foreground">SEO Score</p>
+              <p className={`mt-1 text-2xl font-bold ${seoHealth.seoHealthScore >= 80 ? 'text-green-600' : seoHealth.seoHealthScore >= 60 ? 'text-yellow-500' : 'text-red-500'}`}>
+                {seoHealth.seoHealthScore}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Δημοσιευμένα</p>
+              <p className="mt-1 text-2xl font-bold">{seoHealth.seoTotal}</p>
+            </div>
+            <div className={`rounded-lg border bg-card p-4 ${seoHealth.seoMissingImage > 0 ? 'border-red-300' : 'border-border'}`}>
+              <p className="text-xs text-muted-foreground">Χωρίς εικόνα</p>
+              <p className={`mt-1 text-2xl font-bold ${seoHealth.seoMissingImage > 0 ? 'text-red-500' : 'text-green-600'}`}>{seoHealth.seoMissingImage}</p>
+            </div>
+            <div className={`rounded-lg border bg-card p-4 ${seoHealth.seoMissingTitle > 0 ? 'border-yellow-300' : 'border-border'}`}>
+              <p className="text-xs text-muted-foreground">Χωρίς SEO Title</p>
+              <p className={`mt-1 text-2xl font-bold ${seoHealth.seoMissingTitle > 0 ? 'text-yellow-500' : 'text-green-600'}`}>{seoHealth.seoMissingTitle}</p>
+            </div>
+            <div className={`rounded-lg border bg-card p-4 ${seoHealth.seoMissingDescription > 0 ? 'border-yellow-300' : 'border-border'}`}>
+              <p className="text-xs text-muted-foreground">Χωρίς Meta Desc.</p>
+              <p className={`mt-1 text-2xl font-bold ${seoHealth.seoMissingDescription > 0 ? 'text-yellow-500' : 'text-green-600'}`}>{seoHealth.seoMissingDescription}</p>
+            </div>
+            <div className={`rounded-lg border bg-card p-4 ${seoHealth.seoMissingTags > 0 ? 'border-yellow-300' : 'border-border'}`}>
+              <p className="text-xs text-muted-foreground">Χωρίς Tags</p>
+              <p className={`mt-1 text-2xl font-bold ${seoHealth.seoMissingTags > 0 ? 'text-yellow-500' : 'text-green-600'}`}>{seoHealth.seoMissingTags}</p>
             </div>
           </div>
         </section>

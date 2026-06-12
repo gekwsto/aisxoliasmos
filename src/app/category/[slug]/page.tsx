@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { mapPrismaArticle, ARTICLE_PUBLIC_SELECT } from '@/lib/article-mapper';
+import { SITE_URL, categoryCanonical, breadcrumbJsonLd, categoryPageJsonLd } from '@/lib/seo';
 import ArticleCard from '@/components/articles/ArticleCard';
 import TrendingSidebar from '@/components/ui/TrendingSidebar';
 
@@ -16,11 +17,21 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const category = await prisma.category.findUnique({ where: { slug }, select: { name: true } });
+  const category = await prisma.category.findUnique({ where: { slug }, select: { name: true, slug: true } });
   if (!category) return { title: 'Κατηγορία δεν βρέθηκε' };
+  const description = `Τα τελευταία άρθρα για ${category.name} — AI, Τεχνολογία, Οικονομία και πολλά άλλα από το ΑΙΣΧΟΛΙΑΣΜΟΣ.`;
   return {
-    title: `${category.name} — Άρθρα | ΑΙΣΧΟΛΙΑΣΜΟΣ`,
-    description: `Τα τελευταία άρθρα για ${category.name} από το ΑΙΣΧΟΛΙΑΣΜΟΣ.`,
+    title: `${category.name} — Άρθρα & Αναλύσεις | ΑΙΣΧΟΛΙΑΣΜΟΣ`,
+    description,
+    alternates: { canonical: categoryCanonical(slug) },
+    openGraph: {
+      title: `${category.name} | ΑΙΣΧΟΛΙΑΣΜΟΣ`,
+      description,
+      url: categoryCanonical(slug),
+      type: 'website',
+      locale: 'el_GR',
+      siteName: 'ΑΙΣΧΟΛΙΑΣΜΟΣ',
+    },
   };
 }
 
@@ -45,8 +56,24 @@ export default async function CategoryPage({
   if (!category) notFound();
 
   const articles = rawArticles.map(mapPrismaArticle);
+  const catDescription = `Τα τελευταία άρθρα για ${category.name} — AI, Τεχνολογία, Οικονομία και πολλά άλλα από το ΑΙΣΧΟΛΙΑΣΜΟΣ.`;
+
+  const breadcrumbLd = breadcrumbJsonLd([
+    { name: 'Αρχική', url: SITE_URL },
+    { name: category.name, url: categoryCanonical(slug) },
+  ]);
+
+  const collectionLd = categoryPageJsonLd({
+    name: category.name,
+    slug: category.slug,
+    description: catDescription,
+    articleCount: articles.length,
+  });
 
   return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionLd) }} />
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Category header */}
       <div
@@ -110,5 +137,6 @@ export default async function CategoryPage({
         </div>
       )}
     </div>
+    </>
   );
 }

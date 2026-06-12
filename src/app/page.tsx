@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { mapPrismaArticle, ARTICLE_PUBLIC_SELECT } from '@/lib/article-mapper';
+import { SITE_URL, canonicalUrl, websiteJsonLd, organizationJsonLd } from '@/lib/seo';
 import FeaturedArticle from '@/components/articles/FeaturedArticle';
 import ArticleCard from '@/components/articles/ArticleCard';
 import ArticleGrid from '@/components/articles/ArticleGrid';
@@ -14,6 +15,13 @@ export const metadata: Metadata = {
   title: 'ΑΙΣΧΟΛΙΑΣΜΟΣ — Η επικαιρότητα με έξυπνο σχολιασμό',
   description:
     'Ενημερωτικό portal για AI, Τεχνολογία, Οικονομία, Επιχειρηματικότητα και ό,τι αξίζει να ξέρεις.',
+  alternates: { canonical: SITE_URL },
+  openGraph: {
+    type: 'website',
+    url: SITE_URL,
+    siteName: 'ΑΙΣΧΟΛΙΑΣΜΟΣ',
+    locale: 'el_GR',
+  },
 };
 
 export default async function HomePage() {
@@ -36,14 +44,21 @@ export default async function HomePage() {
 
   if (!featuredArticle) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
-        <p className="text-xl text-slate-400">Δεν υπάρχουν ακόμη δημοσιευμένα άρθρα.</p>
-        <p className="text-sm text-slate-400 mt-2">Χρησιμοποίησε το admin panel για να δημιουργήσεις και να εγκρίνεις άρθρα.</p>
-      </div>
+      <>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd()) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }} />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
+          <p className="text-xl text-slate-400">Δεν υπάρχουν ακόμη δημοσιευμένα άρθρα.</p>
+          <p className="text-sm text-slate-400 mt-2">Χρησιμοποίησε το admin panel για να δημιουργήσεις και να εγκρίνεις άρθρα.</p>
+        </div>
+      </>
     );
   }
 
   return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd()) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }} />
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Hero: Featured + latest 4 in column */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
@@ -110,5 +125,6 @@ export default async function HomePage() {
         </section>
       )}
     </div>
+    </>
   );
 }
