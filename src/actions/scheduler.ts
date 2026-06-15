@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { FacebookClient } from '@/lib/social/facebook';
 import { logEvent, SERVICE } from '@/lib/monitoring/events';
+import { SITE_URL } from '@/lib/seo';
 import { SocialPostStatus, ScheduledPostStatus, SocialPlatform, QueueItemStatus } from '@/generated/prisma/enums';
 import { _executeQueueItem } from './queue';
 
@@ -90,7 +91,10 @@ export async function runScheduler(): Promise<RunSchedulerResult> {
       status: ScheduledPostStatus.PENDING,
       scheduledFor: { lte: new Date() },
     },
-    include: { socialPost: { select: { content: true, platform: true } } },
+    include: {
+      socialPost: { select: { content: true, platform: true } },
+      article: { select: { slug: true } },
+    },
   });
 
   let published = 0;
@@ -101,7 +105,9 @@ export async function runScheduler(): Promise<RunSchedulerResult> {
     let result: { ok: boolean; error?: string };
 
     if (sp.platform === SocialPlatform.FACEBOOK) {
-      const res = await FacebookClient.publish({ content: sp.socialPost.content });
+      const articleLink = `${SITE_URL}/article/${sp.article.slug}`;
+      console.log('[facebook] PAYLOAD', { message: sp.socialPost.content.slice(0, 80) + '…', link: articleLink });
+      const res = await FacebookClient.publish({ content: sp.socialPost.content, link: articleLink });
       if (res.ok) {
         await prisma.scheduledPost.update({
           where: { id: sp.id },

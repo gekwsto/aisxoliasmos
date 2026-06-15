@@ -1,6 +1,6 @@
 import type { PlatformClient, PostPayload, PostResult, PostInsights } from './platforms';
 
-const GRAPH = 'https://graph.facebook.com/v18.0';
+const GRAPH = 'https://graph.facebook.com/v25.0';
 
 function maskToken(token: string): string {
   if (token.length <= 10) return '***';
@@ -18,11 +18,30 @@ export const FacebookClient: PlatformClient = {
   async publish(payload: PostPayload): Promise<PostResult> {
     const { pageId, token } = getCredentials();
     try {
-      const body = new URLSearchParams({ message: payload.content, access_token: token });
-      if (payload.link) body.set('link', payload.link);
+      const bodyObj: Record<string, string> = {
+        message: payload.content,
+        access_token: token,
+      };
+      if (payload.link) bodyObj.link = payload.link;
 
-      const res = await fetch(`${GRAPH}/${pageId}/feed`, { method: 'POST', body });
-      const json = (await res.json()) as { id?: string; error?: { message?: string } };
+      console.log('[facebook] FACEBOOK POST PAYLOAD', {
+        endpoint: `${GRAPH}/${pageId}/feed`,
+        message: payload.content.slice(0, 100) + (payload.content.length > 100 ? '…' : ''),
+        link: payload.link ?? '(none — no OG preview will appear)',
+      });
+
+      const res = await fetch(`${GRAPH}/${pageId}/feed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj),
+      });
+      const json = (await res.json()) as { id?: string; error?: { message?: string; code?: number } };
+
+      console.log('[facebook] GRAPH API RESPONSE', {
+        status: res.status,
+        postId: json.id ?? null,
+        error: json.error ?? null,
+      });
 
       if (!res.ok || !json.id) {
         const msg = json.error?.message ?? `HTTP ${res.status}`;

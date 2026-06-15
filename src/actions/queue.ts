@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { FacebookClient } from '@/lib/social/facebook';
 import { logEvent, SERVICE } from '@/lib/monitoring/events';
+import { SITE_URL } from '@/lib/seo';
 import { ArticleStatus, SocialPostStatus, QueueItemStatus } from '@/generated/prisma/enums';
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -312,7 +313,9 @@ export async function _executeQueueItem(queueItemId: string): Promise<Result> {
     // Step 2: Publish Facebook post if attached
     let fbError: string | undefined;
     if (item.socialPost) {
-      const res = await FacebookClient.publish({ content: item.socialPost.content });
+      const articleLink = `${SITE_URL}/article/${item.article.slug}`;
+      console.log('[facebook] PAYLOAD', { message: item.socialPost.content.slice(0, 80) + '…', link: articleLink });
+      const res = await FacebookClient.publish({ content: item.socialPost.content, link: articleLink });
       if (res.ok) {
         await prisma.socialPost.update({
           where: { id: item.socialPost.id },

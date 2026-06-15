@@ -47,6 +47,13 @@ export async function publishToFacebook(
     body.link = options.link;
   }
 
+  console.log('[facebook] FACEBOOK POST PAYLOAD', {
+    endpoint: `https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/feed`,
+    message: options.message.slice(0, 100) + (options.message.length > 100 ? '…' : ''),
+    link: options.link ?? '(none — no OG preview will appear)',
+    token: maskToken(accessToken),
+  });
+
   const response = await fetch(
     `https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/feed`,
     {
@@ -57,6 +64,12 @@ export async function publishToFacebook(
   );
 
   const data = (await response.json()) as FacebookPublishResult | FacebookErrorResponse;
+
+  console.log('[facebook] GRAPH API RESPONSE', {
+    status: response.status,
+    postId: 'id' in data ? data.id : null,
+    error: 'error' in data ? data.error : null,
+  });
 
   if ('error' in data) {
     throw new Error(`Facebook API: ${data.error.message} (code ${data.error.code})`);
