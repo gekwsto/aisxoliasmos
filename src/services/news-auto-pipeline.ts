@@ -246,7 +246,13 @@ async function _runPipeline(): Promise<PipelineRunResult> {
   const scores = await scoreArticles(toScore);
 
   if (scores.length === 0) {
-    plog('ai_scoring_failed', { reason: 'scoreArticles returned empty — parse error or API failure' });
+    plog('ai_scoring_failed', { reason: 'scoreArticles returned empty — check [scoring] logs for API/parse error' });
+    return {
+      ok: false,
+      scannedFeeds: sources.length, failedFeeds, rssItems: allNewItems.length,
+      candidates: filtered.length, generated: 0, rejected: filtered.length, facebookPosted: 0,
+      reason: 'AI scoring parse failed — check server logs for [scoring] entries',
+    };
   }
 
   // Detect if AI returned 0-10 scale instead of 0-100 (safety net)
