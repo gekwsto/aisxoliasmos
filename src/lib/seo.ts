@@ -1,4 +1,4 @@
-export const SITE_URL = 'https://aisxoliasmos.com';
+export const SITE_URL = 'https://aisxoliasmos.gr';
 export const SITE_NAME = 'ΑΙΣΧΟΛΙΑΣΜΟΣ';
 export const SITE_DESCRIPTION =
   'Ενημερωτικό portal για AI, Τεχνολογία, Οικονομία και Επικαιρότητα με έξυπνο σχολιασμό.';
@@ -31,7 +31,7 @@ export function organizationJsonLd() {
     ],
     contactPoint: {
       '@type': 'ContactPoint',
-      email: 'info@aisxoliasmos.com',
+      email: 'info@aisxoliasmos.gr',
       contactType: 'editorial',
     },
   };
