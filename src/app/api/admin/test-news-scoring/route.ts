@@ -139,13 +139,13 @@ export async function GET() {
       reason,
       aiDetail: score
         ? {
-            viralScore: score.viralScore,
-            discussionScore: score.discussionScore,
-            businessValueScore: score.businessValueScore,
+            greekInterestScore: score.greekInterestScore,
             searchPotentialScore: score.searchPotentialScore,
-            controversyScore: score.controversyScore,
-            facebookDiscussionScore: score.facebookDiscussionScore,
+            facebookClickScore: score.facebookClickScore,
+            evergreenScore: score.evergreenScore,
             overallScore: score.overallScore,
+            rejected: score.rejected,
+            rejectReason: score.rejectReason || null,
             reasoning: score.reasoning,
           }
         : null,

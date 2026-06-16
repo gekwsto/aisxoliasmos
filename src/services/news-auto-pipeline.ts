@@ -275,14 +275,16 @@ async function _runPipeline(): Promise<PipelineRunResult> {
     const score = scores.find((s) => s.id === item.url);
     const rawScore = score?.overallScore ?? 0;
     const normalizedScore = rawScore * scaleMultiplier;
-    const passed = normalizedScore >= threshold;
-    return {
-      item,
-      rawScore,
-      normalizedScore,
-      passed,
-      rejectReason: !score ? 'no_ai_score' : !passed ? `score ${normalizedScore} < threshold ${threshold}` : undefined,
-    };
+    const autoRejected = Boolean(score?.rejected);
+    const passed = !autoRejected && normalizedScore >= threshold;
+    const rejectReason = !score
+      ? 'no_ai_score'
+      : autoRejected
+      ? `auto_rejected: ${score.rejectReason || 'AI decision'}`
+      : !passed
+      ? `score ${normalizedScore} < threshold ${threshold}`
+      : undefined;
+    return { item, rawScore, normalizedScore, passed, rejectReason };
   });
 
   const qualifiedItems = scoredFiltered

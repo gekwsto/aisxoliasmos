@@ -314,20 +314,18 @@ model DiscoveredArticle {
 }
 
 model ContentScore {
-  id                      String            @id @default(cuid())
-  discoveredArticleId     String            @unique
-  discoveredArticle       DiscoveredArticle @relation(fields: [discoveredArticleId], references: [id], onDelete: Cascade)
-  viralScore              Int               @default(0)
-  discussionScore         Int               @default(0)
-  businessValueScore      Int               @default(0)
-  searchPotentialScore    Int               @default(0)
-  controversyScore        Int               @default(0)
-  facebookDiscussionScore Int               @default(0)
-  overallScore            Int               @default(0)
-  whyThisMatters          String?           @db.Text
-  bestFacebookAngle       String?           @db.Text
-  reasoning               String?           @db.Text
-  scoredAt                DateTime          @default(now())
+  id                   String            @id @default(cuid())
+  discoveredArticleId  String            @unique
+  discoveredArticle    DiscoveredArticle @relation(fields: [discoveredArticleId], references: [id], onDelete: Cascade)
+  greekInterestScore   Int               @default(0)
+  searchPotentialScore Int               @default(0)
+  facebookClickScore   Int               @default(0)
+  evergreenScore       Int               @default(0)
+  overallScore         Int               @default(0)
+  rejected             Boolean           @default(false)
+  rejectReason         String?           @db.Text
+  reasoning            String?           @db.Text
+  scoredAt             DateTime          @default(now())
 
   @@map("content_scores")
 }

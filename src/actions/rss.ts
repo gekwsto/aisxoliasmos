@@ -71,21 +71,14 @@ async function _scoreAndSave(
 
   let filtered = 0;
   for (const s of scores) {
-    const src = sourceMap.get(s.id);
-    const isGreek = src?.language === 'EL' || src?.country === 'GR';
-    const bonus = isGreek ? 10 : 0;
-    const facebookBonus = isGreek ? 5 : 0;
-
     const scoreData = {
-      viralScore: s.viralScore,
-      discussionScore: s.discussionScore,
-      businessValueScore: s.businessValueScore,
+      greekInterestScore: s.greekInterestScore,
       searchPotentialScore: s.searchPotentialScore,
-      controversyScore: s.controversyScore,
-      facebookDiscussionScore: Math.min(100, s.facebookDiscussionScore + facebookBonus),
-      overallScore: Math.min(100, s.overallScore + bonus),
-      whyThisMatters: s.whyThisMatters || null,
-      bestFacebookAngle: s.bestFacebookAngle || null,
+      facebookClickScore: s.facebookClickScore,
+      evergreenScore: s.evergreenScore,
+      overallScore: s.overallScore,
+      rejected: s.rejected,
+      rejectReason: s.rejectReason || null,
       reasoning: s.reasoning || null,
     };
 
@@ -95,13 +88,14 @@ async function _scoreAndSave(
       update: { ...scoreData, scoredAt: new Date() },
     });
 
-    // Auto-filter: ignore if ALL three thresholds fail
+    // Auto-filter: ignore if AI rejected or score too low on all dimensions
     if (config.autoFilterEnabled) {
       const t = config.autoFilterThresholds;
       const fails =
-        s.overallScore < t.overallScore &&
-        s.viralScore < t.viralScore &&
-        s.discussionScore < t.discussionScore;
+        s.rejected ||
+        (s.overallScore < t.overallScore &&
+          s.greekInterestScore < t.greekInterestScore &&
+          s.facebookClickScore < t.facebookClickScore);
       if (fails) {
         await prisma.discoveredArticle.updateMany({
           where: { id: s.id, status: DiscoveredStatus.NEW },

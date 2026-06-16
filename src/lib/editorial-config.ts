@@ -5,8 +5,8 @@ const CONFIG_PATH = path.join(process.cwd(), 'config/editorial.json');
 
 export interface AutoFilterThresholds {
   overallScore: number;
-  viralScore: number;
-  discussionScore: number;
+  greekInterestScore: number;
+  facebookClickScore: number;
 }
 
 export interface EditorialConfig {
@@ -16,7 +16,7 @@ export interface EditorialConfig {
 
 const DEFAULTS: EditorialConfig = {
   autoFilterEnabled: true,
-  autoFilterThresholds: { overallScore: 60, viralScore: 65, discussionScore: 65 },
+  autoFilterThresholds: { overallScore: 40, greekInterestScore: 10, facebookClickScore: 6 },
 };
 
 export function getEditorialConfig(): EditorialConfig {
