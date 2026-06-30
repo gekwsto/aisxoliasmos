@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { mapPrismaArticle, ARTICLE_PUBLIC_SELECT } from '@/lib/article-mapper';
-import { SITE_URL, categoryCanonical, breadcrumbJsonLd, categoryPageJsonLd } from '@/lib/seo';
+import { SITE_URL, categoryCanonical, breadcrumbJsonLd, categoryPageJsonLd, DEFAULT_OG_IMAGE, SITE_NAME, SITE_TWITTER } from '@/lib/seo';
 import ArticleCard from '@/components/articles/ArticleCard';
 import TrendingSidebar from '@/components/ui/TrendingSidebar';
 
@@ -19,18 +19,27 @@ export async function generateMetadata({
   const { slug } = await params;
   const category = await prisma.category.findUnique({ where: { slug }, select: { name: true, slug: true } });
   if (!category) return { title: 'Κατηγορία δεν βρέθηκε' };
-  const description = `Τα τελευταία άρθρα για ${category.name} — AI, Τεχνολογία, Οικονομία και πολλά άλλα από το ΑΙΣΧΟΛΙΑΣΜΟΣ.`;
+  const description = `Τα τελευταία άρθρα για ${category.name} — AI, Τεχνολογία, Οικονομία και πολλά άλλα από το ${SITE_NAME}.`;
   return {
-    title: `${category.name} — Άρθρα & Αναλύσεις | ΑΙΣΧΟΛΙΑΣΜΟΣ`,
+    title: `${category.name} — Άρθρα & Αναλύσεις | ${SITE_NAME}`,
     description,
     alternates: { canonical: categoryCanonical(slug) },
     openGraph: {
-      title: `${category.name} | ΑΙΣΧΟΛΙΑΣΜΟΣ`,
+      title: `${category.name} | ${SITE_NAME}`,
       description,
       url: categoryCanonical(slug),
       type: 'website',
       locale: 'el_GR',
-      siteName: 'ΑΙΣΧΟΛΙΑΣΜΟΣ',
+      siteName: SITE_NAME,
+      images: [{ url: DEFAULT_OG_IMAGE, width: 1200, height: 630, alt: `${category.name} — ${SITE_NAME}` }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      site: SITE_TWITTER,
+      creator: SITE_TWITTER,
+      title: `${category.name} | ${SITE_NAME}`,
+      description,
+      images: [DEFAULT_OG_IMAGE],
     },
   };
 }

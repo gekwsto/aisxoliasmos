@@ -4,6 +4,7 @@ export const SITE_DESCRIPTION =
   'Ενημερωτικό portal για AI, Τεχνολογία, Οικονομία και Επικαιρότητα με έξυπνο σχολιασμό.';
 export const SITE_LOCALE = 'el_GR';
 export const SITE_TWITTER = '@aisxoliasmos';
+export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-default.jpg`;
 
 export function canonicalUrl(path: string): string {
   return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`;

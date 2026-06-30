@@ -53,6 +53,23 @@ export interface SemanticFilterInput {
   reliabilityScore?: number;
 }
 
+export interface KeywordContribution {
+  keyword: string;
+  location: 'title' | 'excerpt' | 'combined';
+  isPriority: boolean;
+  score: number;
+}
+
+export interface CategoryBreakdown {
+  category: string;
+  contributions: KeywordContribution[];
+  keywordsSubtotal: number;
+  multiKeywordBonus: number;
+  reliabilityMultiplier: number;
+  weightMultiplier: number;
+  finalScore: number;
+}
+
 export interface SemanticFilterResult {
   id: string;
   semanticScore: number;
@@ -61,6 +78,7 @@ export interface SemanticFilterResult {
   secondaryCategory: string | null;
   passedSemanticFilter: boolean;
   filteredReason: string | null;
+  breakdown: CategoryBreakdown[];
 }
 
 // ─── Normalizer ────────────────────────────────────────────────────────────────
@@ -77,10 +95,11 @@ function normalize(text: string): string {
 
 // ─── Core scorer ──────────────────────────────────────────────────────────────
 
-interface CategoryScore {
+interface CategoryScoreDetail {
   category: string;
   score: number;
   matchedKeywords: string[];
+  breakdown: CategoryBreakdown;
 }
 
 export function computeSemanticScore(
@@ -91,11 +110,13 @@ export function computeSemanticScore(
   const excerptNorm = normalize(input.excerpt ?? '');
   const combined = `${titleNorm} ${excerptNorm}`.trim();
 
-  const categoryScores: CategoryScore[] = [];
+  const categoryScores: CategoryScoreDetail[] = [];
 
   for (const [catName, catConfig] of Object.entries(config.categories)) {
     let score = 0;
     const matched: string[] = [];
+    const contributions: KeywordContribution[] = [];
+    const seenNorm = new Set<string>();
     const prioritySet = new Set(
       (catConfig.priorityEntities ?? []).map((e) => normalize(e))
     );
@@ -103,42 +124,58 @@ export function computeSemanticScore(
     for (const kw of catConfig.keywords) {
       const kwNorm = normalize(kw);
       if (!kwNorm) continue;
+      // Skip duplicate normalized forms (dedup at scoring time as safety net)
+      if (seenNorm.has(kwNorm)) continue;
+      seenNorm.add(kwNorm);
 
       const isPriority = prioritySet.has(kwNorm);
       const inTitle = titleNorm.includes(kwNorm);
       const inExcerpt = !inTitle && excerptNorm.includes(kwNorm);
+      const inCombined = !inTitle && !inExcerpt && combined.includes(kwNorm);
 
       if (inTitle) {
-        score += isPriority ? 30 : 30; // title match always +30
-        if (isPriority) score += 25;   // priority entity bonus
+        const kwScore = 30 + (isPriority ? 25 : 0);
+        score += kwScore;
         matched.push(kw);
+        contributions.push({ keyword: kw, location: 'title', isPriority, score: kwScore });
       } else if (inExcerpt) {
-        score += 15;                   // excerpt match +15
-        if (isPriority) score += 25;   // priority entity bonus
+        const kwScore = 15 + (isPriority ? 25 : 0);
+        score += kwScore;
         matched.push(kw);
-      } else if (combined.includes(kwNorm)) {
-        // Partial / combined match (possible overlap of title+excerpt join)
+        contributions.push({ keyword: kw, location: 'excerpt', isPriority, score: kwScore });
+      } else if (inCombined) {
         score += 8;
         matched.push(kw);
+        contributions.push({ keyword: kw, location: 'combined', isPriority, score: 8 });
       }
     }
 
     if (matched.length === 0) continue;
 
-    // Multi-keyword bonus (+10 per additional keyword, capped at +30)
-    if (matched.length >= 2) {
-      score += Math.min((matched.length - 1) * 10, 30);
-    }
+    const keywordsSubtotal = score;
+    const multiKeywordBonus = matched.length >= 2 ? Math.min((matched.length - 1) * 10, 30) : 0;
+    score += multiKeywordBonus;
 
-    // Source reliability multiplier (slight boost for trusted sources)
-    if ((input.reliabilityScore ?? 0) >= 90) {
-      score = Math.round(score * 1.1);
-    }
+    const reliabilityMultiplier = (input.reliabilityScore ?? 0) >= 90 ? 1.1 : 1.0;
+    if (reliabilityMultiplier > 1.0) score = Math.round(score * reliabilityMultiplier);
 
-    // Category weight multiplier
-    score = Math.round(score * catConfig.weight);
+    const weightMultiplier = catConfig.weight;
+    score = Math.round(score * weightMultiplier);
 
-    categoryScores.push({ category: catName, score, matchedKeywords: matched });
+    categoryScores.push({
+      category: catName,
+      score,
+      matchedKeywords: matched,
+      breakdown: {
+        category: catName,
+        contributions,
+        keywordsSubtotal,
+        multiKeywordBonus,
+        reliabilityMultiplier,
+        weightMultiplier,
+        finalScore: score,
+      },
+    });
   }
 
   // Sort by score desc
@@ -173,6 +210,7 @@ export function computeSemanticScore(
     secondaryCategory: second?.category ?? null,
     passedSemanticFilter,
     filteredReason,
+    breakdown: categoryScores.map((c) => c.breakdown),
   };
 }
 

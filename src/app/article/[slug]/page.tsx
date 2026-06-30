@@ -6,7 +6,7 @@ import { Clock } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { mapPrismaArticle, ARTICLE_PUBLIC_SELECT } from '@/lib/article-mapper';
 import { addHeadingIds, extractHeadings } from '@/lib/toc';
-import { SITE_URL, articleCanonical, newsArticleJsonLd, breadcrumbJsonLd, organizationJsonLd, faqPageJsonLd } from '@/lib/seo';
+import { SITE_URL, articleCanonical, newsArticleJsonLd, breadcrumbJsonLd, organizationJsonLd, faqPageJsonLd, DEFAULT_OG_IMAGE, SITE_NAME, SITE_TWITTER } from '@/lib/seo';
 import CategoryBadge from '@/components/ui/CategoryBadge';
 import ShareButtons from '@/components/ui/ShareButtons';
 import Breadcrumbs from '@/components/ui/Breadcrumbs';
@@ -40,6 +40,7 @@ export async function generateMetadata({
       seoTitle: true,
       seoDescription: true,
       generatedImageUrl: true,
+      coverImage: true,
       publishedAt: true,
       updatedAt: true,
       status: true,
@@ -51,11 +52,12 @@ export async function generateMetadata({
   });
   if (!raw || raw.status !== 'PUBLISHED') return { title: 'Άρθρο δεν βρέθηκε' };
 
-  const title = raw.seoTitle || `${raw.title} | ΑΙΣΧΟΛΙΑΣΜΟΣ`;
+  const title = raw.seoTitle || `${raw.title} | ${SITE_NAME}`;
   const description = raw.seoDescription || raw.excerpt || '';
   const canonical = articleCanonical(slug);
   const tags = raw.tags.map((t) => t.tag.name);
   const publishedTime = (raw.publishedAt ?? raw.updatedAt).toISOString();
+  const ogImage = raw.generatedImageUrl ?? raw.coverImage ?? DEFAULT_OG_IMAGE;
 
   return {
     title,
@@ -69,30 +71,22 @@ export async function generateMetadata({
       description,
       url: canonical,
       type: 'article',
-      siteName: 'ΑΙΣΧΟΛΙΑΣΜΟΣ',
+      siteName: SITE_NAME,
       locale: 'el_GR',
       publishedTime,
       modifiedTime: raw.updatedAt.toISOString(),
       authors: [raw.author.name],
       section: raw.category.name,
       tags,
-      ...(raw.generatedImageUrl
-        ? { images: [{ url: raw.generatedImageUrl, width: 1200, height: 630, alt: raw.title }] }
-        : {}),
+      images: [{ url: ogImage, width: 1200, height: 630, alt: raw.title }],
     },
     twitter: {
       card: 'summary_large_image',
-      site: '@aisxoliasmos',
-      creator: '@aisxoliasmos',
+      site: SITE_TWITTER,
+      creator: SITE_TWITTER,
       title: raw.title,
       description,
-      ...(raw.generatedImageUrl ? { images: [raw.generatedImageUrl] } : {}),
-    },
-    other: {
-      'article:published_time': publishedTime,
-      'article:modified_time': raw.updatedAt.toISOString(),
-      'article:section': raw.category.name,
-      'article:tag': tags.join(','),
+      images: [ogImage],
     },
   };
 }

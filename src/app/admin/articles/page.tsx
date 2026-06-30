@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { FileText, Edit, Eye, Users } from 'lucide-react';
+import { FileText, Edit, Eye, Users, FilePlus } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { formatRelativeDate } from '@/lib/utils';
@@ -79,7 +79,16 @@ export default async function ArticlesPage({
             </h1>
             <p className="text-slate-400 text-sm mt-1">{articles.length} άρθρα στην κατηγορία</p>
           </div>
-          {activeTab === 'evergreen' && <EvergreenEngineButton />}
+          <div className="flex items-center gap-2">
+            {activeTab === 'evergreen' && <EvergreenEngineButton />}
+            <Link
+              href="/admin/articles/new"
+              className="flex items-center gap-1.5 text-sm font-bold bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              <FilePlus size={15} />
+              Νέο Άρθρο
+            </Link>
+          </div>
         </div>
 
         {/* Tabs */}

@@ -50,6 +50,7 @@ async function main() {
     { name: 'Viral', slug: 'viral', color: '#db2777' },
     { name: 'Απόψεις', slug: 'apopseis', color: '#475569' },
     { name: 'Αθλητικά', slug: 'athlitika', color: '#16a34a' },
+    { name: 'Καιρός', slug: 'kairos', color: '#0ea5e9' },
   ];
 
   for (const cat of categoryData) {
